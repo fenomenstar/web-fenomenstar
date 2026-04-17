@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "FenomenStar Web"
+version = "1.0.0"
+id = "artifacts/fenomenstar-web"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22457
+
+[services.development]
+run = "pnpm --filter @workspace/fenomenstar-web run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/fenomenstar-web", "run", "build" ]
+publicDir = "artifacts/fenomenstar-web/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22457"
+BASE_PATH = "/"

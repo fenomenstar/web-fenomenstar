@@ -1,0 +1,31 @@
+packages:
+  "framer-motion": "For page transitions, spring animations, and micro-interactions"
+  "clsx": "For conditional class merging"
+  "tailwind-merge": "For merging tailwind classes without conflicts"
+  "date-fns": "For formatting competition countdowns and dates"
+  "@hookform/resolvers": "For form validation with react-hook-form"
+  "react-hook-form": "For form state management"
+  "zod": "For form schemas"
+  "lucide-react": "For beautiful consistent icons across the app"
+
+images:
+  - path: "artifacts/fenomenstar-web/public/images/hero-bg.png"
+    description: "Vibrant neon stage lighting in magenta and cyan, concert atmosphere, dark background"
+    aspect_ratio: "16:9"
+  - path: "artifacts/fenomenstar-web/public/images/logo.png"
+    description: "Bold modern typography logo 'FenomenStar' with a glowing neon star icon, dark background"
+    aspect_ratio: "16:9"
+  - path: "artifacts/fenomenstar-web/public/images/karaoke-bg.png"
+    description: "Glowing neon vintage microphone on a stand, dark moody purple and blue lighting"
+    aspect_ratio: "9:16"
+  - path: "artifacts/fenomenstar-web/public/images/default-avatar.png"
+    description: "Abstract 3D colorful gradient sphere, glowing on dark background, suitable for user avatar"
+    aspect_ratio: "1:1"
+  - path: "artifacts/fenomenstar-web/public/images/live-bg.png"
+    description: "Abstract energetic concert crowd silhouette with bright neon light beams"
+    aspect_ratio: "16:9"
+
+notes:
+  - "Assuming @workspace/api-client-react provides all TanStack hooks exactly as generated in the prompt."
+  - "UI is mobile-first, designed like a TikTok/StarMaker hybrid."
+  - "Using Unsplash URLs for generic video placeholders where API doesn't provide them."
