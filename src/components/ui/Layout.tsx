@@ -63,8 +63,8 @@ export function Layout({ children, hideBottomNav = false }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row">
-      <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card p-4 fixed h-full z-40">
-        <Link href="/" className="flex items-center gap-3 mb-8 px-2 group cursor-pointer">
+      <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card p-3 fixed h-full z-40">
+        <Link href="/" className="flex items-center gap-3 mb-5 px-2 group cursor-pointer">
           <img
             src={logoSrc}
             alt="FenomenStar"
@@ -75,13 +75,13 @@ export function Layout({ children, hideBottomNav = false }: LayoutProps) {
           </span>
         </Link>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto no-scrollbar">
+        <nav className="flex-1 min-h-0 space-y-1 overflow-y-auto pr-1">
           {mainNav.map((item) => (
             <Link
               key={item.path}
               href={item.path}
               className={cn(
-                "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 font-medium",
+                "flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all duration-200 font-medium",
                 isActive(item.path)
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
@@ -104,7 +104,7 @@ export function Layout({ children, hideBottomNav = false }: LayoutProps) {
               key={item.path}
               href={item.path}
               className={cn(
-                "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 font-medium",
+                "flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all duration-200 font-medium",
                 isActive(item.path)
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
@@ -118,7 +118,7 @@ export function Layout({ children, hideBottomNav = false }: LayoutProps) {
           <Link
             href="/doping"
             className={cn(
-              "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 font-bold mt-1",
+              "flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all duration-200 font-bold mt-1",
               isActive("/doping")
                 ? "bg-gradient-to-r from-primary/30 to-accent/20 text-primary"
                 : "text-yellow-400 hover:bg-yellow-400/10",
@@ -134,10 +134,10 @@ export function Layout({ children, hideBottomNav = false }: LayoutProps) {
           </Link>
         </nav>
 
-        <div className="mt-4 pt-4 border-t border-white/5 flex flex-col gap-2">
+        <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-2 shrink-0">
           <Link
             href="/upload"
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-accent text-white py-3.5 rounded-xl font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/40 hover:-translate-y-0.5 transition-all duration-300 text-sm"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-accent text-white py-3 rounded-xl font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/40 hover:-translate-y-0.5 transition-all duration-300 text-sm"
           >
             <PlusSquare className="w-4 h-4" />
             Video Yükle

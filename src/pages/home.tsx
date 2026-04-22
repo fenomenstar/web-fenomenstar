@@ -32,6 +32,57 @@ import {
 import { cn } from "@/lib/utils";
 import { PLAY_STORE_URL } from "@/lib/constants";
 
+const SAMPLE_TREND_VIDEOS = [
+  {
+    id: "promo-video-1",
+    title: "Benimle Oynar Mısın — Tarkan | Karaoke Performansı",
+    username: "zeynep_ses",
+    thumbnailUrl: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=800&q=80",
+    voteCount: 1200,
+    viewCount: 6400,
+    commentCount: 18,
+    isKaraoke: true,
+    category: "Karaoke",
+    description: "Sahne performansıyla haftanın öne çıkan karaoke videosu.",
+  },
+  {
+    id: "promo-video-2",
+    title: "Ritim Showreel",
+    username: "cem_ritim",
+    thumbnailUrl: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=800&q=80",
+    voteCount: 1700,
+    viewCount: 7900,
+    commentCount: 11,
+    isKaraoke: false,
+    category: "Ses",
+    description: "Jüri seçkisinde öne çıkan sahne enerjisi.",
+  },
+  {
+    id: "promo-video-3",
+    title: "Gece Akustik Performansı",
+    username: "melis_karaoke",
+    thumbnailUrl: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80",
+    voteCount: 2200,
+    viewCount: 9500,
+    commentCount: 14,
+    isKaraoke: true,
+    category: "Karaoke",
+    description: "İzleyici oylarıyla yükselen akustik performans.",
+  },
+  {
+    id: "promo-video-4",
+    title: "Sahne Işıkları Altında",
+    username: "arda_ritim",
+    thumbnailUrl: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=800&q=80",
+    voteCount: 1900,
+    viewCount: 8400,
+    commentCount: 9,
+    isKaraoke: false,
+    category: "Ses",
+    description: "Güçlü vokal ve sahne hâkimiyetiyle dikkat çeken performans.",
+  },
+];
+
 function fmt(value: number | undefined | null) {
   if (!value) return "0";
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
@@ -174,7 +225,7 @@ function VideoCard({ video }: { video: any }) {
         )}
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <p className="text-xs font-bold line-clamp-1 mb-1">{video.username}</p>
-          <p className="text-[10px] text-gray-400 line-clamp-1 mb-2">{video.title}</p>
+          <p className="text-[10px] text-gray-400 line-clamp-2 leading-snug mb-2">{video.title}</p>
           <div className="flex items-center gap-3 text-[10px] text-gray-300">
             <span className="flex items-center gap-0.5">
               <Heart className="w-3 h-3 text-pink-400 fill-pink-400" /> {fmt(video.voteCount)}
@@ -201,7 +252,14 @@ export default function Home() {
   const { data: karaokeData } = useGetKaraokeTracks({ limit: 4 });
 
   const competitions = competitionsData?.competitions ?? [];
-  const videos = videosData?.videos ?? [];
+  const rawVideos = videosData?.videos ?? [];
+  const filteredVideos = rawVideos.filter((video: any) => {
+    const values = [video?.title, video?.username, video?.description]
+      .map((value) => String(value || "").trim().toLowerCase());
+
+    return !values.some((value) => ["test", "test1", "deneme"].includes(value));
+  });
+  const videos = filteredVideos.length > 0 ? filteredVideos : SAMPLE_TREND_VIDEOS;
   const topPlayers = leaderboardData?.entries?.slice(0, 3) ?? [];
   const brands = brandsData?.brands ?? [];
   const karaokeTracks = karaokeData?.tracks ?? [];
@@ -302,7 +360,7 @@ export default function Home() {
                       href="/feed"
                       className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-white/10 backdrop-blur border border-white/20 font-bold text-white hover:bg-white/20 transition-all"
                     >
-                      <Play className="w-4 h-4" /> Videolari Izle
+                      <Play className="w-4 h-4" /> Videoları İzle
                     </Link>
                   </div>
                 </>
