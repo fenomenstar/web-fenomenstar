@@ -6,8 +6,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
 export default function CompetitionDetail() {
-  const [, params] = useRoute("/competitions/:id");
-  const id = Number(params?.id);
+  const route = useRoute("/competitions/:id");
+  const params = route[1] as { id?: string } | null;
+  const id = Number(params ? params.id : 0);
   const { data: comp, isLoading } = useGetCompetitionById(id, { query: { enabled: !!id } });
   const { toast } = useToast();
   const [isJoining, setIsJoining] = useState(false);

@@ -27,11 +27,24 @@ type RegisterPayload = {
     category?: string;
   };
 };
-type VotePayload = { videoId: number; data: { voteType: string } };
-type CommentPayload = { videoId: number; data: { content: string } };
-type JoinPayload = { competitionId: number; data: { videoId: number } };
+type VotePayload = { videoId: number | string; data: { voteType?: string } };
+type CommentPayload = { videoId: number | string; data: { content: string } };
+type JoinPayload = { competitionId: number | string; data: { videoId?: number | string } };
+type NotificationReadPayload = { notificationId: number | string };
+type ReportStatusPayload = { reportId: number | string; status: "reviewing" | "resolved" | "dismissed" };
+type ModerateVideoPayload = { videoId: number | string; action: "approve" | "reject" };
+type DeactivateUserPayload = { userId: number | string };
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/$/, "") || "";
+const API_BASE_URL =
+  (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/$/, "") || "";
+const SUPABASE_URL =
+  (import.meta as any).env?.VITE_SUPABASE_URL?.replace(/\/$/, "") || "";
+const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
+const USE_SUPABASE_AUTH =
+  ((import.meta as any).env?.VITE_USE_SUPABASE_AUTH ?? "true") !== "false";
+
+export const ACCESS_TOKEN_KEY = "fenomenstar_token";
+export const REFRESH_TOKEN_KEY = "fenomenstar_refresh_token";
 
 let authTokenGetter: (() => string | null) | undefined;
 
@@ -39,276 +52,345 @@ export function setAuthTokenGetter(getter: () => string | null) {
   authTokenGetter = getter;
 }
 
-const mockUsers = [
-  {
-    id: 1,
-    email: "zeynep@example.com",
-    username: "zeynep_ses",
-    displayName: "Zeynep Kaya",
-    role: "talent",
-    bio: "Sahne ve karaoke performanslarıyla öne çıkan genç yetenek.",
-    avatarUrl: "https://picsum.photos/seed/user1/300",
-    city: "Istanbul",
-    category: "Ses",
-    totalVotes: 12500,
-    totalViews: 84000,
-    badgeCount: 3,
-    isVerified: true,
-    createdAt: "2026-03-01T12:00:00.000Z",
-  },
-  {
-    id: 2,
-    email: "cem@example.com",
-    username: "cem_ritim",
-    displayName: "Cem Aydin",
-    role: "talent",
-    bio: "Dans ve ritim içerikleri üretiyor.",
-    avatarUrl: "https://picsum.photos/seed/user2/300",
-    city: "Ankara",
-    category: "Dans",
-    totalVotes: 9800,
-    totalViews: 62000,
-    badgeCount: 2,
-    isVerified: true,
-    createdAt: "2026-03-05T12:00:00.000Z",
-  },
-];
+export function setStoredAuth(accessToken?: string | null, refreshToken?: string | null) {
+  if (accessToken) {
+    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  } else {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+  }
 
-const mockCompetitions = [
-  {
-    id: 1,
-    title: "THY Genç Yetenek Yarışması",
-    description: "Sesini ve sahne enerjini göster, büyük ödülü kazan.",
-    category: "Ses",
-    status: "active",
-    startDate: "2026-04-01T12:00:00.000Z",
-    endDate: "2026-05-20T12:00:00.000Z",
-    prizeDescription: "50.000 TL + reklam çekimi",
-    brandId: 101,
-    brandName: "THY",
-    brandLogoUrl: "",
-    participantCount: 324,
-    thumbnailUrl: "https://picsum.photos/seed/comp1/900/500",
-    createdAt: "2026-03-25T12:00:00.000Z",
-  },
-  {
-    id: 2,
-    title: "PepsiStar Karaoke Gecesi",
-    description: "Karaoke performansını yükle, jüriyi etkile.",
-    category: "Karaoke",
-    status: "active",
-    startDate: "2026-04-05T12:00:00.000Z",
-    endDate: "2026-05-10T12:00:00.000Z",
-    prizeDescription: "25.000 TL + stüdyo günü",
-    brandId: 102,
-    brandName: "Pepsi",
-    brandLogoUrl: "",
-    participantCount: 188,
-    thumbnailUrl: "https://picsum.photos/seed/comp2/900/500",
-    createdAt: "2026-03-28T12:00:00.000Z",
-  },
-  {
-    id: 3,
-    title: "FenomenStar Dans Sahnesi",
-    description: "Dans kategorisinde haftanın yıldızı ol.",
-    category: "Dans",
-    status: "upcoming",
-    startDate: "2026-05-12T12:00:00.000Z",
-    endDate: "2026-06-10T12:00:00.000Z",
-    prizeDescription: "Sponsorlu içerik paketi",
-    brandId: 0,
-    brandName: "",
-    brandLogoUrl: "",
-    participantCount: 76,
-    thumbnailUrl: "https://picsum.photos/seed/comp3/900/500",
-    createdAt: "2026-04-02T12:00:00.000Z",
-  },
-];
+  if (refreshToken) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  } else {
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+  }
 
-const mockVideos = Array.from({ length: 12 }, (_, index) => ({
-  id: index + 1,
-  title: `Performans ${index + 1}`,
-  description: "FenomenStar sahnesinden öne çıkan performans.",
-  videoUrl: "",
-  thumbnailUrl: `https://picsum.photos/seed/video${index + 1}/500/900`,
-  category: index % 3 === 0 ? "Karaoke" : index % 3 === 1 ? "Ses" : "Dans",
-  isKaraoke: index % 3 === 0,
-  userId: index % 2 === 0 ? 1 : 2,
-  username: index % 2 === 0 ? "zeynep_ses" : "cem_ritim",
-  userAvatarUrl: `https://picsum.photos/seed/avatar${index + 1}/200`,
-  competitionId: (index % 2) + 1,
-  voteCount: 1200 + index * 170,
-  viewCount: 6400 + index * 510,
-  commentCount: 10 + index,
-  duration: 45,
-  createdAt: "2026-04-01T12:00:00.000Z",
-}));
+  setAuthTokenGetter(() => localStorage.getItem(ACCESS_TOKEN_KEY));
+}
 
-const mockComments = [
-  {
-    id: 1,
-    content: "Harika performans.",
-    userId: 10,
-    username: "ayse_yorum",
-    userAvatarUrl: "",
-    createdAt: "2026-04-10T12:00:00.000Z",
-  },
-  {
-    id: 2,
-    content: "Finale kalırsın.",
-    userId: 11,
-    username: "onur_live",
-    userAvatarUrl: "",
-    createdAt: "2026-04-11T12:00:00.000Z",
-  },
-];
+export function clearStoredAuth() {
+  setStoredAuth(null, null);
+}
 
-const mockBrands = [
-  {
-    id: 101,
-    name: "THY",
-    logoUrl: "",
-    description: "Sponsor marka",
-    website: "https://www.turkishairlines.com",
-    isVerified: true,
-    activeCompetitions: 4,
-    totalParticipants: 1200,
-    createdAt: "2026-03-01T12:00:00.000Z",
-  },
-  {
-    id: 102,
-    name: "Pepsi",
-    logoUrl: "",
-    description: "Sponsor marka",
-    website: "https://www.pepsi.com",
-    isVerified: true,
-    activeCompetitions: 2,
-    totalParticipants: 640,
-    createdAt: "2026-03-04T12:00:00.000Z",
-  },
-];
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "fenomenstar_user";
+}
 
-const mockLeaderboardEntries = [
-  {
-    rank: 1,
-    userId: 1,
-    username: "zeynep_ses",
-    displayName: "Zeynep Kaya",
-    avatarUrl: "https://picsum.photos/seed/lb1/200",
-    category: "Ses",
-    score: 18400,
-    voteCount: 12500,
-    videoCount: 14,
-  },
-  {
-    rank: 2,
-    userId: 2,
-    username: "cem_ritim",
-    displayName: "Cem Aydin",
-    avatarUrl: "https://picsum.photos/seed/lb2/200",
-    category: "Dans",
-    score: 15200,
-    voteCount: 9800,
-    videoCount: 11,
-  },
-  {
-    rank: 3,
-    userId: 3,
-    username: "melis_karaoke",
-    displayName: "Melis Demir",
-    avatarUrl: "https://picsum.photos/seed/lb3/200",
-    category: "Karaoke",
-    score: 14100,
-    voteCount: 9100,
-    videoCount: 9,
-  },
-];
+function toArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
 
-const mockTracks = [
-  {
-    id: 1,
-    title: "Yalan",
-    artist: "Sezen Aksu",
-    genre: "Pop",
-    duration: 220,
-    audioUrl: "",
-    lyricsUrl: "",
-    coverUrl: "https://picsum.photos/seed/track1/300",
-    bpm: 98,
-    createdAt: "2026-04-01T12:00:00.000Z",
-  },
-  {
-    id: 2,
-    title: "Bir Derdim Var",
-    artist: "Mor ve Otesi",
-    genre: "Rock",
-    duration: 240,
-    audioUrl: "",
-    lyricsUrl: "",
-    coverUrl: "https://picsum.photos/seed/track2/300",
-    bpm: 110,
-    createdAt: "2026-04-01T12:00:00.000Z",
-  },
-  {
-    id: 3,
-    title: "Benimle Oynar Misin",
-    artist: "Tarkan",
-    genre: "Pop",
-    duration: 210,
-    audioUrl: "",
-    lyricsUrl: "",
-    coverUrl: "https://picsum.photos/seed/track3/300",
-    bpm: 102,
-    createdAt: "2026-04-01T12:00:00.000Z",
-  },
-];
+function toNumber(value: unknown, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
+function buildQuery(params?: Record<string, unknown>) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    searchParams.set(key, String(value));
+  });
+  const query = searchParams.toString();
+  return query ? `?${query}` : "";
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!API_BASE_URL) {
-    throw new Error("API base URL missing");
+    throw new Error("Web API adresi tanımlı değil");
   }
 
   const token = authTokenGetter?.();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    let message = `Request failed: ${response.status}`;
+    try {
+      const payload = await response.json();
+      if (payload?.message) {
+        message = String(payload.message);
+      }
+    } catch {
+      // ignore parse error
+    }
+    throw new Error(message);
+  }
+
+  if (response.status === 204) {
+    return null as T;
   }
 
   return response.json();
 }
 
-function withFallback<T>(remote: () => Promise<T>, fallback: () => T | Promise<T>) {
-  return async () => {
-    try {
-      return await remote();
-    } catch {
-      return await fallback();
-    }
+async function requestWithToken<T>(path: string, token: string): Promise<T> {
+  return request<T>(path, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+async function supabaseAuthRequest<T>(path: string, body?: Record<string, unknown>): Promise<T> {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error("Web Supabase ayarları tanımlı değil");
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/auth/v1${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      String(
+        payload?.msg ||
+          payload?.error_description ||
+          payload?.message ||
+          payload?.error ||
+          `Request failed: ${response.status}`,
+      ),
+    );
+  }
+
+  return payload as T;
+}
+
+function normalizeUser(raw: any) {
+  const displayName = raw?.displayName || raw?.name || raw?.full_name || "FenomenStar Kullanıcı";
+  const email = raw?.email || "";
+  return {
+    id: raw?.id ?? raw?.userId ?? raw?.user_id ?? 0,
+    username: raw?.username || raw?.handle || slugify(displayName || email || String(raw?.id || "user")),
+    displayName,
+    name: displayName,
+    email,
+    role: raw?.role || "viewer",
+    bio: raw?.bio || "",
+    avatarUrl: raw?.avatarUrl || raw?.avatar || raw?.photo_url || "",
+    city: raw?.city || "",
+    category:
+      raw?.category ||
+      raw?.primaryTalent ||
+      (Array.isArray(raw?.talents) && raw.talents.length > 0 ? raw.talents[0] : "") ||
+      "",
+    talents: toArray<string>(raw?.talents),
+    totalVotes: toNumber(raw?.totalVotes ?? raw?.total_votes),
+    totalViews: toNumber(raw?.totalViews ?? raw?.total_views),
+    followers: toNumber(raw?.followers),
+    following: toNumber(raw?.following),
+    badgeCount:
+      toNumber(raw?.badgeCount ?? raw?.badge_count) ||
+      (Array.isArray(raw?.badges) ? raw.badges.length : 0),
+    badges: toArray<string>(raw?.badges),
+    isVerified: Boolean(raw?.isVerified ?? raw?.is_verified ?? raw?.verified),
+    createdAt: raw?.createdAt || raw?.created_at || new Date().toISOString(),
+    website: raw?.website || "",
+    phone: raw?.phone || "",
+    education: raw?.education || "",
+    birthYear: raw?.birthYear || raw?.birth_year || undefined,
+    videoCount: toNumber(raw?.videoCount ?? raw?.video_count),
+    competitionCount: toNumber(raw?.competitionCount ?? raw?.competition_count),
+    rank: toNumber(raw?.rank),
+  };
+}
+
+function normalizeVideo(raw: any) {
+  const displayName = raw?.displayName || raw?.user_name || raw?.name || "";
+  const username = raw?.username || slugify(displayName || `user_${raw?.user_id || raw?.userId || raw?.id}`);
+  return {
+    id: raw?.id ?? 0,
+    title: raw?.title || "FenomenStar Performansı",
+    description: raw?.description || "",
+    videoUrl: raw?.videoUrl || raw?.video_url || "",
+    thumbnailUrl: raw?.thumbnailUrl || raw?.thumbnail || "",
+    category: raw?.category || "Genel",
+    isKaraoke: Boolean(raw?.isKaraoke ?? raw?.is_karaoke ?? String(raw?.category || "").toLowerCase().includes("karaoke")),
+    userId: raw?.userId ?? raw?.user_id ?? 0,
+    username,
+    displayName,
+    userAvatarUrl: raw?.userAvatarUrl || raw?.user_avatar || "",
+    competitionId: raw?.competitionId ?? raw?.competition_id ?? null,
+    voteCount: toNumber(raw?.voteCount ?? raw?.votes),
+    viewCount: toNumber(raw?.viewCount ?? raw?.views),
+    commentCount: toNumber(raw?.commentCount ?? raw?.comments_count),
+    duration: toNumber(raw?.duration, 0),
+    createdAt: raw?.createdAt || raw?.created_at || new Date().toISOString(),
+    status: raw?.status || "ready",
+  };
+}
+
+function normalizeCompetition(raw: any) {
+  return {
+    id: raw?.id ?? 0,
+    title: raw?.title || "FenomenStar Yarışması",
+    description: raw?.description || "",
+    category: raw?.category || raw?.thematic || "Genel",
+    status: raw?.status || "upcoming",
+    startDate: raw?.startDate || raw?.start_date || "",
+    endDate: raw?.endDate || raw?.end_date || "",
+    prizeDescription: raw?.prizeDescription || raw?.prize || "",
+    brandId: raw?.brandId ?? raw?.brand_id ?? null,
+    brandName: raw?.brandName || raw?.brand_name || "",
+    brandLogoUrl: raw?.brandLogoUrl || raw?.brand_logo_url || "",
+    participantCount: toNumber(raw?.participantCount ?? raw?.participants),
+    thumbnailUrl: raw?.thumbnailUrl || raw?.image || raw?.thumbnail || "",
+    createdAt: raw?.createdAt || raw?.created_at || new Date().toISOString(),
+  };
+}
+
+function normalizeBrand(raw: any) {
+  return {
+    id: raw?.id ?? 0,
+    name: raw?.name || "FenomenStar Marka",
+    logoUrl: raw?.logoUrl || raw?.logo_url || "",
+    description: raw?.description || "",
+    website: raw?.website || "",
+    isVerified: Boolean(raw?.isVerified ?? raw?.is_verified ?? raw?.verified),
+    activeCompetitions: toNumber(raw?.activeCompetitions ?? raw?.active_competitions),
+    totalParticipants: toNumber(raw?.totalParticipants ?? raw?.total_participants),
+    createdAt: raw?.createdAt || raw?.created_at || new Date().toISOString(),
+  };
+}
+
+function normalizeLeaderboardEntry(raw: any) {
+  const displayName = raw?.displayName || raw?.name || "FenomenStar Kullanıcısı";
+  const totalVotes = toNumber(raw?.voteCount ?? raw?.total_votes ?? raw?.score ?? raw?.totalPoints);
+  return {
+    rank: toNumber(raw?.rank),
+    userId: raw?.userId ?? raw?.user_id ?? raw?.id ?? 0,
+    username: raw?.username || slugify(displayName),
+    displayName,
+    avatarUrl: raw?.avatarUrl || raw?.avatar || "",
+    category: raw?.category || raw?.city || "",
+    score: totalVotes,
+    totalPoints: totalVotes,
+    voteCount: totalVotes,
+    totalVotes,
+    totalViews: toNumber(raw?.total_views ?? raw?.totalViews),
+    videoCount: toNumber(raw?.videoCount ?? raw?.video_count),
+    city: raw?.city || "",
+  };
+}
+
+function normalizeTrack(raw: any) {
+  return {
+    id: raw?.id ?? 0,
+    title: raw?.title || "Karaoke Parçası",
+    artist: raw?.artist || "FenomenStar Originals",
+    genre: raw?.genre || "Pop",
+    duration: toNumber(raw?.duration ?? raw?.duration_seconds),
+    audioUrl: raw?.audioUrl || raw?.audio_url || "",
+    lyricsUrl: raw?.lyricsUrl || raw?.lyrics_url || "",
+    coverUrl: raw?.coverUrl || raw?.cover_url || "",
+    bpm: toNumber(raw?.bpm, 90),
+    createdAt: raw?.createdAt || raw?.created_at || new Date().toISOString(),
+  };
+}
+
+function normalizeNotification(raw: any) {
+  return {
+    id: raw?.id ?? 0,
+    type: raw?.type || "system",
+    title: raw?.title || raw?.message || "FenomenStar Bildirimi",
+    text: raw?.message || raw?.title || "Yeni bir bildirim var.",
+    sub: raw?.sub || raw?.metadata?.subtitle || "",
+    read: Boolean(raw?.read ?? raw?.is_read),
+    createdAt: raw?.createdAt || raw?.created_at || new Date().toISOString(),
+  };
+}
+
+function normalizeWalletHistory(raw: any) {
+  return {
+    id: raw?.id ?? `${raw?.type || "txn"}-${raw?.created_at || Date.now()}`,
+    type: raw?.type || "transaction",
+    description: raw?.description || raw?.label || "Cüzdan işlemi",
+    amount: toNumber(raw?.amount),
+    currency: raw?.currency || "TRY",
+    balanceAfter: toNumber(raw?.balanceAfter ?? raw?.balance_after),
+    createdAt: raw?.createdAt || raw?.created_at || new Date().toISOString(),
+    metadata: raw?.metadata || {},
+  };
+}
+
+function normalizeReport(raw: any) {
+  return {
+    id: raw?.id ?? 0,
+    targetType: raw?.targetType || raw?.target_type || "unknown",
+    targetId: raw?.targetId || raw?.target_id || "",
+    reporterName: raw?.reporterName || raw?.reporter_name || "",
+    reason: raw?.reason || "",
+    status: raw?.status || "open",
+    createdAt: raw?.createdAt || raw?.created_at || new Date().toISOString(),
+  };
+}
+
+function normalizeModerationVideo(raw: any) {
+  return {
+    id: raw?.id ?? 0,
+    title: raw?.title || "İçerik",
+    description: raw?.description || "",
+    status: raw?.status || "pending",
+    videoUrl: raw?.videoUrl || raw?.video_url || "",
+    thumbnailUrl: raw?.thumbnailUrl || raw?.thumbnail || "",
+    createdAt: raw?.createdAt || raw?.created_at || new Date().toISOString(),
+    userId: raw?.userId ?? raw?.user_id ?? 0,
+    userName: raw?.userName || raw?.user_name || "Kullanıcı",
+    userEmail: raw?.userEmail || raw?.user_email || "",
   };
 }
 
 export function useLogin(config?: MutationConfig<any, LoginPayload>) {
   return useMutation({
     mutationFn: async ({ data }: LoginPayload) => {
-      try {
-        return await request("/api/auth/login", {
-          method: "POST",
-          body: JSON.stringify(data),
+      if (USE_SUPABASE_AUTH) {
+        const response = await supabaseAuthRequest<any>("/token?grant_type=password", {
+          email: data.email,
+          password: data.password,
         });
-      } catch {
+        const accessToken = response?.access_token || response?.session?.access_token || null;
+        const refreshToken = response?.refresh_token || response?.session?.refresh_token || null;
+        const me = accessToken ? await requestWithToken<any>("/api/auth/me", accessToken) : null;
+
         return {
-          token: "demo-token",
-          user: mockUsers[0],
+          accessToken,
+          refreshToken,
+          user: normalizeUser(me?.user || me || response?.user || {}),
         };
       }
+
+      const response = await request<any>("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+      return {
+        ...response,
+        accessToken: response?.accessToken || response?.token || null,
+        refreshToken: response?.refreshToken || null,
+        user: normalizeUser(response?.user || {}),
+      };
     },
     ...(config?.mutation ?? {}),
   });
@@ -317,24 +399,59 @@ export function useLogin(config?: MutationConfig<any, LoginPayload>) {
 export function useRegister(config?: MutationConfig<any, RegisterPayload>) {
   return useMutation({
     mutationFn: async ({ data }: RegisterPayload) => {
-      try {
-        return await request("/api/auth/register", {
-          method: "POST",
-          body: JSON.stringify(data),
-        });
-      } catch {
-        return {
-          token: "demo-token",
-          user: {
-            ...mockUsers[0],
+      if (USE_SUPABASE_AUTH) {
+        const response = await supabaseAuthRequest<any>("/signup", {
+          email: data.email,
+          password: data.password,
+          data: {
+            name: data.displayName || data.username,
             username: data.username,
-            email: data.email,
-            displayName: data.displayName || data.username,
-            city: data.city || "Istanbul",
-            category: data.category || "Ses",
+            city: data.city,
+            category: data.category,
+            role: "viewer",
           },
+        });
+        const accessToken = response?.access_token || response?.session?.access_token || null;
+        const refreshToken = response?.refresh_token || response?.session?.refresh_token || null;
+        const me = accessToken ? await requestWithToken<any>("/api/auth/me", accessToken) : null;
+
+        return {
+          accessToken,
+          refreshToken,
+          requiresEmailConfirmation: !accessToken,
+          user: normalizeUser(
+            me?.user || me || {
+              id: response?.user?.id,
+              email: data.email,
+              username: data.username,
+              displayName: data.displayName || data.username,
+              city: data.city,
+              category: data.category,
+            },
+          ),
         };
       }
+
+      const response = await request<any>("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: data.displayName || data.username,
+          email: data.email,
+          password: data.password,
+          city: data.city,
+          bio: data.category ? `${data.category} kategorisinde yeni FenomenStar kullanıcısı.` : undefined,
+        }),
+      });
+      return {
+        ...response,
+        accessToken: response?.accessToken || response?.token || null,
+        refreshToken: response?.refreshToken || null,
+        user: normalizeUser({
+          ...response?.user,
+          username: data.username,
+          category: data.category,
+        }),
+      };
     },
     ...(config?.mutation ?? {}),
   });
@@ -346,38 +463,24 @@ export function useGetCompetitions(
 ) {
   return useQuery({
     queryKey: ["competitions", params],
-    queryFn: withFallback(
-      () => request(`/api/competitions`),
-      () => {
-        let competitions = [...mockCompetitions];
-        if (params?.status && params.status !== "all") {
-          competitions = competitions.filter((item) => item.status === params.status);
-        }
-        if (params?.category && params.category !== "all") {
-          competitions = competitions.filter((item) => item.category === params.category);
-        }
-        if (params?.limit) {
-          competitions = competitions.slice(0, params.limit);
-        }
-        return {
-          competitions,
-          total: competitions.length,
-          page: params?.page ?? 1,
-          limit: params?.limit ?? competitions.length,
-        };
-      },
-    ),
+    queryFn: async () => {
+      const response = await request<any>(`/api/competitions${buildQuery(params)}`);
+      const competitions = toArray<any>(response?.competitions ?? response).map(normalizeCompetition);
+      return {
+        competitions,
+        total: toNumber(response?.total, competitions.length),
+        page: toNumber(response?.page, params?.page || 1),
+        limit: toNumber(response?.limit, params?.limit || competitions.length || 0),
+      };
+    },
     ...(config?.query ?? {}),
   });
 }
 
-export function useGetCompetitionById(id: number, config?: QueryConfig<any>) {
+export function useGetCompetitionById(id: number | string, config?: QueryConfig<any>) {
   return useQuery({
     queryKey: ["competition", id],
-    queryFn: withFallback(
-      () => request(`/api/competitions/${id}`),
-      () => mockCompetitions.find((item) => item.id === id) ?? mockCompetitions[0],
-    ),
+    queryFn: async () => normalizeCompetition(await request<any>(`/api/competitions/${id}`)),
     enabled: !!id && (config?.query?.enabled ?? true),
     ...(config?.query ?? {}),
   });
@@ -385,74 +488,62 @@ export function useGetCompetitionById(id: number, config?: QueryConfig<any>) {
 
 export function useJoinCompetition(config?: MutationConfig<any, JoinPayload>) {
   return useMutation({
-    mutationFn: async ({ competitionId, data }: JoinPayload) => {
-      try {
-        return await request(`/api/competitions/${competitionId}/join`, {
-          method: "POST",
-          body: JSON.stringify(data),
-        });
-      } catch {
-        return { success: true, competitionId, ...data };
-      }
-    },
+    mutationFn: async ({ competitionId, data }: JoinPayload) =>
+      request(`/api/competitions/${competitionId}/join`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     ...(config?.mutation ?? {}),
   });
 }
 
 export function useGetVideos(
-  params?: { category?: string; competitionId?: number; page?: number; limit?: number },
+  params?: { category?: string; competitionId?: number | string; page?: number; limit?: number },
   config?: QueryConfig<any>,
 ) {
   return useQuery({
     queryKey: ["videos", params],
-    queryFn: withFallback(
-      () => request(`/api/videos`),
-      () => {
-        let videos = [...mockVideos];
-        if (params?.category) {
-          videos = videos.filter((item) => item.category === params.category);
-        }
-        if (params?.competitionId) {
-          videos = videos.filter((item) => item.competitionId === params.competitionId);
-        }
-        if (params?.limit) {
-          videos = videos.slice(0, params.limit);
-        }
-        return {
-          videos,
-          total: videos.length,
-          page: params?.page ?? 1,
-          limit: params?.limit ?? videos.length,
-        };
-      },
-    ),
+    queryFn: async () => {
+      const response = await request<any>(`/api/videos${buildQuery(params)}`);
+      const videos = toArray<any>(response?.videos ?? response).map(normalizeVideo);
+      return {
+        videos,
+        total: toNumber(response?.total, videos.length),
+        page: toNumber(response?.page, params?.page || 1),
+        limit: toNumber(response?.limit, params?.limit || videos.length || 0),
+      };
+    },
     ...(config?.query ?? {}),
   });
 }
 
 export function useVoteVideo(config?: MutationConfig<any, VotePayload>) {
   return useMutation({
-    mutationFn: async ({ videoId, data }: VotePayload) => {
-      try {
-        return await request(`/api/videos/${videoId}/vote`, {
-          method: "POST",
-          body: JSON.stringify(data),
-        });
-      } catch {
-        return { success: true, newVoteCount: 1, message: "Mock vote recorded" };
-      }
-    },
+    mutationFn: async ({ videoId, data }: VotePayload) =>
+      request(`/api/videos/${videoId}/vote`, {
+        method: "POST",
+        body: JSON.stringify({ voteType: data.voteType || "upvote" }),
+      }),
     ...(config?.mutation ?? {}),
   });
 }
 
-export function useGetVideoComments(videoId: number, config?: QueryConfig<any>) {
+export function useGetVideoComments(videoId: number | string, config?: QueryConfig<any>) {
   return useQuery({
     queryKey: ["comments", videoId],
-    queryFn: withFallback(
-      () => request(`/api/videos/${videoId}/comments`),
-      () => ({ comments: mockComments }),
-    ),
+    queryFn: async () => {
+      const response = await request<any>(`/api/videos/${videoId}/comments`);
+      return {
+        comments: toArray<any>(response?.comments ?? response).map((comment) => ({
+          id: comment?.id ?? 0,
+          content: comment?.content || "",
+          userId: comment?.userId ?? comment?.user_id ?? 0,
+          username: comment?.username || slugify(comment?.user_name || "yorumcu"),
+          userAvatarUrl: comment?.userAvatarUrl || comment?.user_avatar || "",
+          createdAt: comment?.createdAt || comment?.created_at || new Date().toISOString(),
+        })),
+      };
+    },
     enabled: !!videoId && (config?.query?.enabled ?? true),
     ...(config?.query ?? {}),
   });
@@ -460,22 +551,11 @@ export function useGetVideoComments(videoId: number, config?: QueryConfig<any>) 
 
 export function useAddComment(config?: MutationConfig<any, CommentPayload>) {
   return useMutation({
-    mutationFn: async ({ videoId, data }: CommentPayload) => {
-      try {
-        return await request(`/api/videos/${videoId}/comments`, {
-          method: "POST",
-          body: JSON.stringify(data),
-        });
-      } catch {
-        return {
-          id: Date.now(),
-          content: data.content,
-          userId: 1,
-          username: "zeynep_ses",
-          createdAt: new Date().toISOString(),
-        };
-      }
-    },
+    mutationFn: async ({ videoId, data }: CommentPayload) =>
+      request(`/api/videos/${videoId}/comments`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     ...(config?.mutation ?? {}),
   });
 }
@@ -483,10 +563,10 @@ export function useAddComment(config?: MutationConfig<any, CommentPayload>) {
 export function useGetBrands(_params?: Record<string, never>, config?: QueryConfig<any>) {
   return useQuery({
     queryKey: ["brands"],
-    queryFn: withFallback(
-      () => request(`/api/brands`),
-      () => ({ brands: mockBrands }),
-    ),
+    queryFn: async () => {
+      const response = await request<any>("/api/brands");
+      return { brands: toArray<any>(response?.brands ?? response).map(normalizeBrand) };
+    },
     ...(config?.query ?? {}),
   });
 }
@@ -497,15 +577,16 @@ export function useGetLeaderboard(
 ) {
   return useQuery({
     queryKey: ["leaderboard", params],
-    queryFn: withFallback(
-      () => request(`/api/leaderboard`),
-      () => ({
-        entries: mockLeaderboardEntries,
+    queryFn: async () => {
+      const response = await request<any>(`/api/users/leaderboard${buildQuery(params)}`);
+      const entries = toArray<any>(response?.entries ?? response).map(normalizeLeaderboardEntry);
+      return {
+        entries,
         period: params?.period ?? "weekly",
         category: params?.category ?? "all",
         updatedAt: new Date().toISOString(),
-      }),
-    ),
+      };
+    },
     ...(config?.query ?? {}),
   });
 }
@@ -516,63 +597,67 @@ export function useGetKaraokeTracks(
 ) {
   return useQuery({
     queryKey: ["karaoke-tracks", params],
-    queryFn: withFallback(
-      () => request(`/api/karaoke/tracks`),
-      () => {
-        let tracks = [...mockTracks];
-        if (params?.q) {
-          const lowered = params.q.toLowerCase();
-          tracks = tracks.filter(
-            (item) =>
-              item.title.toLowerCase().includes(lowered) ||
-              item.artist.toLowerCase().includes(lowered),
-          );
-        }
-        if (params?.genre && params.genre !== "all") {
-          tracks = tracks.filter((item) => item.genre.toLowerCase() === params.genre?.toLowerCase());
-        }
-        if (params?.limit) {
-          tracks = tracks.slice(0, params.limit);
-        }
-        return {
-          tracks,
-          total: tracks.length,
-          page: params?.page ?? 1,
-        };
-      },
-    ),
+    queryFn: async () => {
+      const response = await request<any>(`/api/karaoke/tracks${buildQuery(params)}`);
+      const tracks = toArray<any>(response?.tracks ?? response).map(normalizeTrack);
+      return {
+        tracks,
+        total: toNumber(response?.total, tracks.length),
+        page: toNumber(response?.page, params?.page || 1),
+      };
+    },
     ...(config?.query ?? {}),
   });
 }
 
 export function useSearch(
-  params: { q: string; type?: SearchType; page?: number; limit?: number },
+  params: { q: string; type?: SearchType; page?: number; limit?: number; mode?: "fts" | "semantic" | "hybrid" },
   config?: QueryConfig<any>,
 ) {
   return useQuery({
     queryKey: ["search", params],
-    queryFn: withFallback(
-      () => request(`/api/search?q=${encodeURIComponent(params.q)}&type=${params.type ?? "all"}`),
-      () => {
-        const q = params.q.toLowerCase();
-        const users = mockUsers.filter(
-          (item) =>
-            item.username.toLowerCase().includes(q) ||
-            item.displayName.toLowerCase().includes(q),
+    queryFn: async () => {
+      const query = params.q.trim();
+      if (query.length < 2) {
+        return { users: [], videos: [], competitions: [], total: 0, query, isSemanticSearch: false };
+      }
+
+      const [searchResponse, competitionsResponse] = await Promise.all([
+        request<any>(
+          `/api/search${buildQuery({
+            q: query,
+            type: params.type === "competitions" ? "all" : params.type || "all",
+            limit: params.limit || 20,
+            mode: params.mode || "fts",
+          })}`,
+        ),
+        params.type === "all" || params.type === "competitions"
+          ? request<any>(`/api/competitions${buildQuery({ limit: params.limit || 20 })}`)
+          : Promise.resolve({ competitions: [] }),
+      ]);
+
+      const users = toArray<any>(searchResponse?.users).map(normalizeUser);
+      const videos = toArray<any>(searchResponse?.videos).map(normalizeVideo);
+      const competitionSource = toArray<any>(competitionsResponse?.competitions ?? competitionsResponse);
+      const lowered = query.toLowerCase();
+      const competitions = competitionSource
+        .map(normalizeCompetition)
+        .filter((competition) =>
+          [competition.title, competition.description, competition.brandName, competition.category]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(lowered)),
         );
-        const videos = mockVideos.filter((item) => item.title.toLowerCase().includes(q));
-        const competitions = mockCompetitions.filter((item) => item.title.toLowerCase().includes(q));
-        return {
-          users: params.type === "all" || params.type === "users" ? users : [],
-          videos: params.type === "all" || params.type === "videos" ? videos : [],
-          competitions:
-            params.type === "all" || params.type === "competitions" ? competitions : [],
-          total: users.length + videos.length + competitions.length,
-          query: params.q,
-          isSemanticSearch: false,
-        };
-      },
-    ),
+
+      return {
+        users: params.type === "all" || params.type === "users" ? users : [],
+        videos: params.type === "all" || params.type === "videos" ? videos : [],
+        competitions:
+          params.type === "all" || params.type === "competitions" ? competitions : [],
+        total: users.length + videos.length + competitions.length,
+        query,
+        isSemanticSearch: (params.mode || "fts") !== "fts",
+      };
+    },
     ...(config?.query ?? {}),
   });
 }
@@ -580,19 +665,189 @@ export function useSearch(
 export function useGetMe(config?: QueryConfig<any>) {
   return useQuery({
     queryKey: ["me"],
-    queryFn: withFallback(() => request(`/api/users/me`), () => mockUsers[0]),
+    queryFn: async () => {
+      const response = await request<any>("/api/auth/me");
+      return normalizeUser(response?.user || response);
+    },
     ...(config?.query ?? {}),
   });
 }
 
-export function useGetUserVideos(userId: number, config?: QueryConfig<any>) {
+export function useGetUserById(userId: number | string, config?: QueryConfig<any>) {
   return useQuery({
-    queryKey: ["user-videos", userId],
-    queryFn: withFallback(
-      () => request(`/api/users/${userId}/videos`),
-      () => mockVideos.filter((item) => item.userId === userId),
-    ),
+    queryKey: ["user", userId],
+    queryFn: async () => normalizeUser(await request<any>(`/api/users/${userId}`)),
     enabled: !!userId && (config?.query?.enabled ?? true),
     ...(config?.query ?? {}),
+  });
+}
+
+export function useGetUserVideos(userId: number | string, config?: QueryConfig<any>) {
+  return useQuery({
+    queryKey: ["user-videos", userId],
+    queryFn: async () => {
+      const response = await request<any>("/api/videos?limit=50");
+      return toArray<any>(response?.videos ?? response)
+        .map(normalizeVideo)
+        .filter((video) => String(video.userId) === String(userId));
+    },
+    enabled: !!userId && (config?.query?.enabled ?? true),
+    ...(config?.query ?? {}),
+  });
+}
+
+export function useGetTalents(config?: QueryConfig<any>) {
+  return useQuery({
+    queryKey: ["talents"],
+    queryFn: async () => {
+      const response = await request<any>("/api/users/talents");
+      return { talents: toArray<any>(response?.talents ?? response).map(normalizeUser) };
+    },
+    ...(config?.query ?? {}),
+  });
+}
+
+export function useGetNotifications(config?: QueryConfig<any>) {
+  return useQuery({
+    queryKey: ["notifications"],
+    queryFn: async () => {
+      const response = await request<any>("/api/notifications");
+      return {
+        notifications: toArray<any>(response?.notifications ?? response).map(normalizeNotification),
+        pagination: response?.pagination,
+      };
+    },
+    ...(config?.query ?? {}),
+  });
+}
+
+export function useGetUnreadNotificationCount(config?: QueryConfig<any>) {
+  return useQuery({
+    queryKey: ["notifications", "unread-count"],
+    queryFn: async () => request<any>("/api/notifications/unread-count"),
+    ...(config?.query ?? {}),
+  });
+}
+
+export function useMarkNotificationRead(config?: MutationConfig<any, NotificationReadPayload>) {
+  return useMutation({
+    mutationFn: async ({ notificationId }: NotificationReadPayload) =>
+      request(`/api/notifications/${notificationId}/read`, { method: "PATCH" }),
+    ...(config?.mutation ?? {}),
+  });
+}
+
+export function useMarkAllNotificationsRead(config?: MutationConfig<any, void>) {
+  return useMutation({
+    mutationFn: async () => request("/api/notifications/read-all", { method: "PATCH" }),
+    ...(config?.mutation ?? {}),
+  });
+}
+
+export function useGetPaymentCatalog(config?: QueryConfig<any>) {
+  return useQuery({
+    queryKey: ["payments", "catalog"],
+    queryFn: async () => request<any>("/api/payments/catalog"),
+    ...(config?.query ?? {}),
+  });
+}
+
+export function useGetWalletSummary(config?: QueryConfig<any>) {
+  return useQuery({
+    queryKey: ["payments", "wallet"],
+    queryFn: async () => {
+      const response = await request<any>("/api/payments/wallet");
+      return {
+        wallet: {
+          ...response?.wallet,
+          fenomenCoins: toNumber(response?.wallet?.fenomenCoins ?? response?.wallet?.fenomen_coins),
+          starCoins: toNumber(response?.wallet?.starCoins ?? response?.wallet?.star_coins),
+        },
+        history: toArray<any>(response?.history).map(normalizeWalletHistory),
+      };
+    },
+    ...(config?.query ?? {}),
+  });
+}
+
+export function useGetAdminDashboard(config?: QueryConfig<any>) {
+  return useQuery({
+    queryKey: ["admin", "dashboard"],
+    queryFn: async () => request<any>("/api/admin/dashboard"),
+    ...(config?.query ?? {}),
+  });
+}
+
+export function useGetAdminUsers(
+  params?: { limit?: number; offset?: number; role?: string },
+  config?: QueryConfig<any>,
+) {
+  return useQuery({
+    queryKey: ["admin", "users", params],
+    queryFn: async () => {
+      const response = await request<any>(`/api/admin/users${buildQuery(params)}`);
+      return { users: toArray<any>(response?.users ?? response).map(normalizeUser) };
+    },
+    ...(config?.query ?? {}),
+  });
+}
+
+export function useDeactivateUser(config?: MutationConfig<any, DeactivateUserPayload>) {
+  return useMutation({
+    mutationFn: async ({ userId }: DeactivateUserPayload) =>
+      request(`/api/admin/users/${userId}`, { method: "DELETE" }),
+    ...(config?.mutation ?? {}),
+  });
+}
+
+export function useGetAdminReports(
+  params?: { limit?: number; offset?: number; status?: string },
+  config?: QueryConfig<any>,
+) {
+  return useQuery({
+    queryKey: ["admin", "reports", params],
+    queryFn: async () => {
+      const response = await request<any>(`/api/admin/reports${buildQuery(params)}`);
+      return { reports: toArray<any>(response?.reports ?? response).map(normalizeReport) };
+    },
+    ...(config?.query ?? {}),
+  });
+}
+
+export function useUpdateReportStatus(config?: MutationConfig<any, ReportStatusPayload>) {
+  return useMutation({
+    mutationFn: async ({ reportId, status }: ReportStatusPayload) =>
+      request(`/api/admin/reports/${reportId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      }),
+    ...(config?.mutation ?? {}),
+  });
+}
+
+export function useGetAdminModerationQueue(
+  params?: { limit?: number; offset?: number; status?: string },
+  config?: QueryConfig<any>,
+) {
+  return useQuery({
+    queryKey: ["admin", "moderation", params],
+    queryFn: async () => {
+      const response = await request<any>(`/api/admin/videos/moderation${buildQuery(params)}`);
+      return {
+        videos: toArray<any>(response?.videos ?? response).map(normalizeModerationVideo),
+      };
+    },
+    ...(config?.query ?? {}),
+  });
+}
+
+export function useModerateVideo(config?: MutationConfig<any, ModerateVideoPayload>) {
+  return useMutation({
+    mutationFn: async ({ videoId, action }: ModerateVideoPayload) =>
+      request(`/api/admin/videos/${videoId}/moderation`, {
+        method: "PATCH",
+        body: JSON.stringify({ action }),
+      }),
+    ...(config?.mutation ?? {}),
   });
 }
