@@ -2,9 +2,39 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { setAuthTokenGetter } from "@workspace/api-client-react";
+import {
+  ACCESS_TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+  setAuthTokenGetter,
+} from "@workspace/api-client-react";
 
-setAuthTokenGetter(() => localStorage.getItem("fenomenstar_token"));
+function getValidStoredToken() {
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  if (!token) return null;
+
+  try {
+    const [, payloadSegment] = token.split(".");
+    if (!payloadSegment) throw new Error("Missing JWT payload");
+
+    const normalized = payloadSegment.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const payload = JSON.parse(atob(padded));
+
+    if (typeof payload?.iss !== "string" || !payload.iss.includes("supabase")) {
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      return null;
+    }
+
+    return token;
+  } catch {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    return null;
+  }
+}
+
+setAuthTokenGetter(() => getValidStoredToken());
 
 import Home from "./pages/home";
 import Feed from "./pages/feed";
